@@ -17,6 +17,8 @@ import com.github.mvysny.vokdataloader.SortClause
 import io.ebean.DB
 import io.ebean.ExpressionList
 import io.ebean.Junction
+import io.ebean.OrderBy
+import io.ebean.OrderBy.Property
 import io.ebean.Query
 
 class EntityDataLoader<T: BaseModel>(val clazz: Class<T>): DataLoader<T> {
@@ -40,8 +42,11 @@ class EntityDataLoader<T: BaseModel>(val clazz: Class<T>): DataLoader<T> {
   }
 }
 
-private fun <T: BaseModel> ExpressionList<T>.makeEBeanSort(sortBy: List<SortClause>): ExpressionList<T> {
-  TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+private fun <T: BaseModel> ExpressionList<T>.makeEBeanSort(sortBy: List<SortClause>): OrderBy<T> {
+  val orderBy = this.orderBy()
+  sortBy.map {sort -> Property(sort.propertyName, sort.asc)}
+    .forEach {prop -> orderBy.add(prop)}
+  return orderBy
 }
 
 private fun <T: BaseModel> ExpressionList<T>.makeEBeanFilter(filter: Filter<in T>?): ExpressionList<T> {
