@@ -16,6 +16,7 @@ import com.github.mvysny.vokdataloader.OrFilter
 import com.github.mvysny.vokdataloader.SortClause
 import io.ebean.DB
 import io.ebean.ExpressionList
+import io.ebean.Junction
 import io.ebean.Query
 
 class EntityDataLoader<T: BaseModel>(val clazz: Class<T>): DataLoader<T> {
@@ -43,7 +44,7 @@ private fun <T: BaseModel> ExpressionList<T>.makeEBeanSort(sortBy: List<SortClau
   TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
 }
 
-private fun <T: BaseModel> ExpressionList<T>.makeEBeanFilter(filter: Filter<T>?): ExpressionList<T> {
+private fun <T: BaseModel> ExpressionList<T>.makeEBeanFilter(filter: Filter<in T>?): ExpressionList<T> {
   filter ?: return this
   return when(filter) {
     is EqFilter        -> this.eq(filter.propertyName, filter.value)
@@ -58,10 +59,22 @@ private fun <T: BaseModel> ExpressionList<T>.makeEBeanFilter(filter: Filter<T>?)
     is ILikeFilter     -> this.ilike(filter.propertyName, filter.value)
     is IsNullFilter    -> this.isNull(filter.propertyName)
     is IsNotNullFilter -> this.isNotNull(filter.propertyName)
-    is AndFilter       -> this.and().makeEBeanFilter().endAnd()
-    is OrFilter        -> this.or().makeEBeanFilter().orAnd()
+    is AndFilter       -> {
+      var andStart: Junction<T> = this.and()
+      val andChain = filter.children.fold(andStart) {ands, filterAnd ->
+        ands.makeEBeanFilter(filterAnd) as Junction<T>
+      }
+      andChain.endAnd()
+    }
+    is OrFilter        -> {
+      val orStart: Junction<T> = this.or()
+      val orChain = filter.children.fold(orStart) {ors, filterOr ->
+        ors.makeEBeanFilter(filterOr) as Junction<T>
+      }
+      orChain.endOr()
+    }
     is InFilter        -> this.`in`(filter.propertyName, filter.value)
-    is NotFilter       -> this.not(makeEBeanFilter(filter.child))
+    is NotFilter       -> this.not().makeEBeanFilter(filter.child)
     else               -> this
   }
 }
